@@ -2,10 +2,14 @@
 
 MATPOWER互換のNewton-Raphson法による潮流計算ツールです。JSX版とHTML Web版の2つの実装を提供します。
 
+## 🌐 オンラインデモ
+
+**HTML Web版をブラウザで今すぐ試す**: [https://lutelute.github.io/rnw_pf_sample_20251225/powerflow_app.html](https://lutelute.github.io/rnw_pf_sample_20251225/powerflow_app.html)
+
 ## 📁 ファイル構成
 
 ```
-rikuden_nw_pf_sample_20251225/
+rnw_pf_sample_20251225/
 ├── power-flow-calculator.jsx    # React JSX版潮流計算ツール
 ├── powerflow_app.html          # Web HTML版潮流計算ツール
 ├── case14_init.csv             # IEEE 14母線系統初期値データ
