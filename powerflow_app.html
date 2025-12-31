@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerFlow Web - 潮流計算ツール</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+JP:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #141b24;
+            --bg-tertiary: #1a2332;
+            --accent-blue: #00d4ff;
+            --accent-green: #00ff88;
+            --accent-yellow: #ffd000;
+            --accent-red: #ff4757;
+            --accent-purple: #a855f7;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --grid-color: rgba(0, 212, 255, 0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'IBM Plex Sans JP', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+        .grid-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px); background-size: 50px 50px; pointer-events: none; z-index: 0; }
+        .container { position: relative; z-index: 1; max-width: 1800px; margin: 0 auto; padding: 20px; }
+        header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 30px; }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo-icon { width: 50px; height: 50px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-green)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 20px; color: var(--bg-primary); }
+        .logo h1 { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600; background: linear-gradient(90deg, var(--accent-blue), var(--accent-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .logo span { font-size: 14px; color: var(--text-secondary); }
+        .header-actions { display: flex; gap: 15px; }
+        .btn { font-family: 'JetBrains Mono', monospace; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; }
+        .btn-primary { background: linear-gradient(135deg, var(--accent-blue), var(--accent-green)); color: var(--bg-primary); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3); }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { border-color: var(--accent-blue); }
+        .btn-purple { background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); color: white; }
+        .main-grid { display: grid; grid-template-columns: 420px 1fr 420px; gap: 20px; min-height: calc(100vh - 180px); }
+        .panel { background: var(--bg-secondary); border-radius: 16px; border: 1px solid var(--border-color); overflow: hidden; }
+        .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-tertiary); }
+        .panel-title { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; color: var(--accent-blue); display: flex; align-items: center; gap: 10px; }
+        .panel-title::before { content: ''; width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .panel-content { padding: 20px; max-height: calc(100vh - 280px); overflow-y: auto; }
+        .panel-content::-webkit-scrollbar { width: 6px; }
+        .panel-content::-webkit-scrollbar-track { background: var(--bg-tertiary); }
+        .panel-content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        .input-section { margin-bottom: 25px; }
+        .input-section h3 { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        .input-group { display: grid; gap: 10px; }
+        .input-row { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 10px; }
+        .input-row label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); }
+        .input-row input, .input-row select { font-family: 'JetBrains Mono', monospace; padding: 10px 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; }
+        .input-row input:focus, .input-row select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1); }
+        .data-table-container { margin-top: 15px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
+        .data-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+        .data-table th { background: var(--bg-tertiary); padding: 10px 8px; text-align: left; color: var(--accent-blue); font-weight: 500; border-bottom: 1px solid var(--border-color); }
+        .data-table td { padding: 8px; border-bottom: 1px solid var(--border-color); }
+        .data-table tr:hover { background: var(--bg-tertiary); }
+        .data-table input, .data-table select { width: 100%; padding: 6px 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+        .canvas-container { position: relative; height: 100%; min-height: 500px; }
+        #networkCanvas { width: 100%; height: 100%; background: var(--bg-primary); border-radius: 8px; }
+        .canvas-controls { position: absolute; bottom: 20px; left: 20px; display: flex; gap: 10px; }
+        .canvas-btn { width: 40px; height: 40px; border-radius: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; }
+        .canvas-btn:hover { border-color: var(--accent-blue); }
+        .result-card { background: var(--bg-tertiary); border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid var(--border-color); }
+        .result-card h4 { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; text-transform: uppercase; }
+        .result-value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 600; color: var(--accent-green); }
+        .result-unit { font-size: 14px; color: var(--text-secondary); margin-left: 5px; }
+        .result-detail { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color); font-size: 12px; }
+        .result-detail:last-child { border-bottom: none; }
+        .result-label { color: var(--text-secondary); }
+        .result-data { font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+        .status { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-converged .status-dot { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+        .status-failed .status-dot { background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+        .status-running .status-dot { background: var(--accent-yellow); animation: blink 0.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .chart-container { height: 160px; background: var(--bg-primary); border-radius: 8px; margin-top: 10px; padding: 10px; position: relative; }
+        .tabs { display: flex; gap: 5px; padding: 10px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); }
+        .tab { padding: 8px 16px; border: none; background: transparent; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; font-size: 12px; cursor: pointer; border-radius: 6px; }
+        .tab.active { background: var(--bg-primary); color: var(--accent-blue); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .sample-cases { display: grid; gap: 8px; margin-bottom: 20px; }
+        .sample-case { padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
+        .sample-case:hover { border-color: var(--accent-blue); transform: translateX(5px); }
+        .sample-case h4 { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent-blue); margin-bottom: 2px; }
+        .sample-case p { font-size: 10px; color: var(--text-secondary); }
+        .sample-case.distribution { border-left: 3px solid var(--accent-yellow); }
+        .sample-case.transmission { border-left: 3px solid var(--accent-blue); }
+        .console { background: var(--bg-primary); border-radius: 8px; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 11px; max-height: 100px; overflow-y: auto; border: 1px solid var(--border-color); }
+        .console-line { padding: 2px 0; color: var(--text-secondary); }
+        .console-line.info { color: var(--accent-blue); }
+        .console-line.success { color: var(--accent-green); }
+        .console-line.warning { color: var(--accent-yellow); }
+        .console-line.error { color: var(--accent-red); }
+        .table-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .table-action-btn { padding: 6px 12px; font-size: 11px; font-family: 'JetBrains Mono', monospace; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 4px; cursor: pointer; }
+        .table-action-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; }
+        .file-input-wrapper input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+        .checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-blue); }
+        .checkbox-row label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); }
+        .case-category { font-size: 11px; color: var(--accent-yellow); margin: 15px 0 8px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .voltage-limits { display: flex; gap: 10px; margin-top: 10px; font-size: 11px; }
+        .voltage-limits span { padding: 4px 8px; border-radius: 4px; }
+        .v-high { background: rgba(255,71,87,0.2); color: var(--accent-red); }
+        .v-normal { background: rgba(0,255,136,0.2); color: var(--accent-green); }
+        .v-low { background: rgba(255,208,0,0.2); color: var(--accent-yellow); }
+        .timeseries-controls { display: grid; gap: 10px; padding: 15px; background: var(--bg-primary); border-radius: 8px; margin-top: 10px; }
+        .mini-input { padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 11px; width: 100%; }
+        .progress-bar { height: 4px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-blue), var(--accent-green)); width: 0%; transition: width 0.3s; }
+        @media (max-width: 1400px) { .main-grid { grid-template-columns: 380px 1fr; } .results-panel { grid-column: 1 / -1; } }
+        @media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="grid-bg"></div>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">PF</div>
+                <div><h1>PowerFlow Web</h1><span>Newton-Raphson 潮流計算ツール</span></div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="exportResults()">📥 エクスポート</button>
+                <button class="btn btn-primary" onclick="runPowerFlowUI()">▶ 潮流計算実行</button>
+            </div>
+        </header>
+        <div class="main-grid">
+            <div class="panel">
+                <div class="panel-header"><span class="panel-title">系統データ入力</span></div>
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('bus')">母線</button>
+                    <button class="tab" onclick="switchTab('branch')">線路</button>
+                    <button class="tab" onclick="switchTab('settings')">設定</button>
+                    <button class="tab" onclick="switchTab('timeseries')">時系列</button>
+                </div>
+                <div class="panel-content">
+                    <div class="input-section">
+                        <h3>サンプル系統</h3>
+                        <div class="case-category">📡 送電系統</div>
+                        <div class="sample-cases">
+                            <div class="sample-case transmission" onclick="loadCase('case3')"><h4>3母線系統</h4><p>教育用シンプル系統</p></div>
+                            <div class="sample-case transmission" onclick="loadCase('case9')"><h4>IEEE 9母線</h4><p>WECC 3機9母線系統</p></div>
+                            <div class="sample-case transmission" onclick="loadCase('case14')"><h4>IEEE 14母線</h4><p>中規模テストケース</p></div>
+                            <div class="sample-case transmission" onclick="loadCase('case30')"><h4>IEEE 30母線</h4><p>標準テストケース</p></div>
+                        </div>
+                        <div class="case-category">🏘️ 配電系統</div>
+                        <div class="sample-cases">
+                            <div class="sample-case distribution" onclick="loadCase('dist13')"><h4>13ノード配電</h4><p>IEEE 13ノードフィーダ</p></div>
+                            <div class="sample-case distribution" onclick="loadCase('dist33')"><h4>33ノード配電</h4><p>IEEE 33母線放射状系統</p></div>
+                            <div class="sample-case distribution" onclick="loadCase('dist69')"><h4>69ノード配電</h4><p>IEEE 69母線放射状系統</p></div>
+                        </div>
+                    </div>
+                    <div id="tab-bus" class="tab-content active">
+                        <div class="input-section">
+                            <h3>母線データ</h3>
+                            <div class="data-table-container" style="max-height:250px;overflow-y:auto;">
+                                <table class="data-table" id="busTable">
+                                    <thead><tr><th>No.</th><th>Type</th><th>Pd</th><th>Qd</th><th>Pg</th><th>|V|</th><th>θ</th></tr></thead>
+                                    <tbody id="busTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="table-actions">
+                                <button class="table-action-btn" onclick="addBusRow()">+ 追加</button>
+                                <button class="table-action-btn" onclick="removeBusRow()">- 削除</button>
+                                <div class="file-input-wrapper"><button class="table-action-btn">📂 CSV読込</button><input type="file" accept=".csv" onchange="importBusCSV(this)"></div>
+                                <button class="table-action-btn" onclick="exportBusCSV()">💾 CSV保存</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="tab-branch" class="tab-content">
+                        <div class="input-section">
+                            <h3>線路データ</h3>
+                            <div class="data-table-container" style="max-height:250px;overflow-y:auto;">
+                                <table class="data-table" id="branchTable">
+                                    <thead><tr><th>From</th><th>To</th><th>R</th><th>X</th><th>B</th><th>Tap</th></tr></thead>
+                                    <tbody id="branchTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="table-actions">
+                                <button class="table-action-btn" onclick="addBranchRow()">+ 追加</button>
+                                <button class="table-action-btn" onclick="removeBranchRow()">- 削除</button>
+                                <div class="file-input-wrapper"><button class="table-action-btn">📂 CSV読込</button><input type="file" accept=".csv" onchange="importBranchCSV(this)"></div>
+                                <button class="table-action-btn" onclick="exportBranchCSV()">💾 CSV保存</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="tab-settings" class="tab-content">
+                        <div class="input-section">
+                            <h3>計算パラメータ</h3>
+                            <div class="input-group">
+                                <div class="input-row"><label>基準容量</label><input type="number" id="baseMVA" value="100"></div>
+                                <div class="input-row"><label>最大反復</label><input type="number" id="maxIter" value="100"></div>
+                                <div class="input-row"><label>収束判定</label><input type="number" id="tolerance" value="1e-6"></div>
+                                <div class="input-row"><label>計算手法</label><select id="method"><option value="nr">Newton-Raphson</option><option value="gs">Gauss-Seidel</option></select></div>
+                            </div>
+                        </div>
+                        <div class="input-section">
+                            <h3>初期値オプション</h3>
+                            <div class="checkbox-row"><input type="checkbox" id="flatStart"><label for="flatStart">フラットスタート (V=1.0, θ=0)</label></div>
+                        </div>
+                        <div class="input-section">
+                            <h3>電圧制限</h3>
+                            <div class="input-group">
+                                <div class="input-row"><label>上限 (pu)</label><input type="number" id="vMax" value="1.05" step="0.01"></div>
+                                <div class="input-row"><label>下限 (pu)</label><input type="number" id="vMin" value="0.95" step="0.01"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="tab-timeseries" class="tab-content">
+                        <div class="input-section">
+                            <h3>時系列シミュレーション</h3>
+                            <div class="timeseries-controls">
+                                <div class="input-row"><label>時間ステップ</label><input type="number" id="tsSteps" value="24" class="mini-input"></div>
+                                <div class="input-row"><label>負荷パターン</label>
+                                    <select id="loadPattern" class="mini-input">
+                                        <option value="daily">日負荷曲線</option>
+                                        <option value="sine">正弦波</option>
+                                        <option value="step">ステップ</option>
+                                        <option value="random">ランダム</option>
+                                    </select>
+                                </div>
+                                <div class="input-row"><label>最小負荷率</label><input type="number" id="loadMin" value="0.5" step="0.1" class="mini-input"></div>
+                                <div class="input-row"><label>最大負荷率</label><input type="number" id="loadMax" value="1.2" step="0.1" class="mini-input"></div>
+                                <div class="checkbox-row"><input type="checkbox" id="includePV"><label for="includePV">PV発電を含む</label></div>
+                                <div class="input-row"><label>PV容量(MW)</label><input type="number" id="pvCapacity" value="50" class="mini-input"></div>
+                            </div>
+                            <button class="btn btn-purple" style="width:100%;margin-top:15px;" onclick="runTimeseries()">▶ 時系列計算実行</button>
+                            <div class="progress-bar"><div class="progress-fill" id="tsProgress"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">系統図</span>
+                    <div class="status" id="statusIndicator"><div class="status-dot"></div><span id="statusText">待機中</span></div>
+                </div>
+                <div class="panel-content canvas-container">
+                    <canvas id="networkCanvas"></canvas>
+                    <div class="canvas-controls">
+                        <button class="canvas-btn" onclick="zoomIn()">+</button>
+                        <button class="canvas-btn" onclick="zoomOut()">−</button>
+                        <button class="canvas-btn" onclick="resetView()">⟳</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel results-panel">
+                <div class="panel-header"><span class="panel-title">計算結果</span></div>
+                <div class="panel-content">
+                    <div class="result-card">
+                        <h4>総損失</h4>
+                        <div class="result-value" id="totalLoss">--<span class="result-unit">MW</span></div>
+                    </div>
+                    <div class="result-card">
+                        <h4>電圧プロファイル</h4>
+                        <div class="chart-container"><canvas id="voltageChart"></canvas></div>
+                        <div class="voltage-limits">
+                            <span class="v-high">過電圧: <span id="vHighCount">0</span></span>
+                            <span class="v-normal">正常: <span id="vNormalCount">0</span></span>
+                            <span class="v-low">低電圧: <span id="vLowCount">0</span></span>
+                        </div>
+                    </div>
+                    <div class="result-card">
+                        <h4>収束情報</h4>
+                        <div class="result-detail"><span class="result-label">反復回数</span><span class="result-data" id="iterCount">--</span></div>
+                        <div class="result-detail"><span class="result-label">最大ミスマッチ</span><span class="result-data" id="maxMismatch">--</span></div>
+                        <div class="result-detail"><span class="result-label">計算時間</span><span class="result-data" id="calcTime">--</span></div>
+                    </div>
+                    <div class="result-card">
+                        <h4>母線結果</h4>
+                        <div class="data-table-container" style="max-height:150px;overflow-y:auto;">
+                            <table class="data-table"><thead><tr><th>Bus</th><th>|V|</th><th>θ</th><th>P</th><th>Q</th></tr></thead>
+                            <tbody id="busResultBody"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="result-card">
+                        <h4>線路潮流</h4>
+                        <div class="data-table-container" style="max-height:150px;overflow-y:auto;">
+                            <table class="data-table"><thead><tr><th>Fr</th><th>To</th><th>Pij</th><th>Qij</th><th>Loss</th></tr></thead>
+                            <tbody id="branchResultBody"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="result-card" id="timeseriesResultCard" style="display:none;">
+                        <h4>時系列結果</h4>
+                        <div class="chart-container" style="height:180px;"><canvas id="timeseriesChart"></canvas></div>
+                        <div class="result-detail"><span class="result-label">最大損失</span><span class="result-data" id="tsMaxLoss">--</span></div>
+                        <div class="result-detail"><span class="result-label">最低電圧</span><span class="result-data" id="tsMinVoltage">--</span></div>
+                    </div>
+                    <div class="result-card">
+                        <h4>コンソール</h4>
+                        <div class="console" id="console"><div class="console-line info">[System] 初期化完了</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+// ===== Global Variables =====
+let busData = [], branchData = [], results = null, convergenceHistory = [], timeseriesResults = [];
+let canvas, ctx, zoom = 1, panX = 0, panY = 0;
+
+// ===== Sample Cases =====
+const sampleCases = {
+    case3: { name: "3母線系統", baseMVA: 100,
+        bus: [{type:3,Pd:0,Qd:0,Pg:0,Vm:1.05,Va:0},{type:2,Pd:0,Qd:0,Pg:40,Vm:1.04,Va:-5},{type:1,Pd:100,Qd:40,Pg:0,Vm:0.98,Va:-12}],
+        branch: [{from:1,to:2,r:0.02,x:0.06,b:0.03,tap:1},{from:1,to:3,r:0.08,x:0.24,b:0.025,tap:1},{from:2,to:3,r:0.06,x:0.18,b:0.02,tap:1}]
+    },
+    case9: { name: "IEEE 9母線", baseMVA: 100,
+        bus: [{type:3,Pd:0,Qd:0,Pg:0,Vm:1.04,Va:0},{type:2,Pd:0,Qd:0,Pg:163,Vm:1.025,Va:9.28},{type:2,Pd:0,Qd:0,Pg:85,Vm:1.025,Va:4.66},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.026,Va:-2.22},{type:1,Pd:125,Qd:50,Pg:0,Vm:0.996,Va:-3.99},{type:1,Pd:90,Qd:30,Pg:0,Vm:1.013,Va:-3.69},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.026,Va:3.72},{type:1,Pd:100,Qd:35,Pg:0,Vm:1.016,Va:0.73},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.032,Va:1.97}],
+        branch: [{from:1,to:4,r:0,x:0.0576,b:0,tap:1},{from:4,to:5,r:0.017,x:0.092,b:0.158,tap:1},{from:5,to:6,r:0.039,x:0.17,b:0.358,tap:1},{from:3,to:6,r:0,x:0.0586,b:0,tap:1},{from:6,to:7,r:0.0119,x:0.1008,b:0.209,tap:1},{from:7,to:8,r:0.0085,x:0.072,b:0.149,tap:1},{from:8,to:2,r:0,x:0.0625,b:0,tap:1},{from:8,to:9,r:0.032,x:0.161,b:0.306,tap:1},{from:9,to:4,r:0.01,x:0.085,b:0.176,tap:1}]
+    },
+    case14: { name: "IEEE 14母線", baseMVA: 100,
+        bus: [{type:3,Pd:0,Qd:0,Pg:232.4,Vm:1.06,Va:0},{type:2,Pd:21.7,Qd:12.7,Pg:40,Vm:1.045,Va:-4.98},{type:2,Pd:94.2,Qd:19,Pg:0,Vm:1.01,Va:-12.72},{type:1,Pd:47.8,Qd:-3.9,Pg:0,Vm:1.018,Va:-10.33},{type:1,Pd:7.6,Qd:1.6,Pg:0,Vm:1.02,Va:-8.78},{type:2,Pd:11.2,Qd:7.5,Pg:0,Vm:1.07,Va:-14.22},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.062,Va:-13.37},{type:2,Pd:0,Qd:0,Pg:0,Vm:1.09,Va:-13.36},{type:1,Pd:29.5,Qd:16.6,Pg:0,Vm:1.056,Va:-14.94},{type:1,Pd:9,Qd:5.8,Pg:0,Vm:1.051,Va:-15.1},{type:1,Pd:3.5,Qd:1.8,Pg:0,Vm:1.057,Va:-14.79},{type:1,Pd:6.1,Qd:1.6,Pg:0,Vm:1.055,Va:-15.07},{type:1,Pd:13.5,Qd:5.8,Pg:0,Vm:1.05,Va:-15.16},{type:1,Pd:14.9,Qd:5,Pg:0,Vm:1.036,Va:-16.04}],
+        branch: [{from:1,to:2,r:0.01938,x:0.05917,b:0.0528,tap:1},{from:1,to:5,r:0.05403,x:0.22304,b:0.0492,tap:1},{from:2,to:3,r:0.04699,x:0.19797,b:0.0438,tap:1},{from:2,to:4,r:0.05811,x:0.17632,b:0.034,tap:1},{from:2,to:5,r:0.05695,x:0.17388,b:0.0346,tap:1},{from:3,to:4,r:0.06701,x:0.17103,b:0.0128,tap:1},{from:4,to:5,r:0.01335,x:0.04211,b:0,tap:1},{from:4,to:7,r:0,x:0.20912,b:0,tap:0.978},{from:4,to:9,r:0,x:0.55618,b:0,tap:0.969},{from:5,to:6,r:0,x:0.25202,b:0,tap:0.932},{from:6,to:11,r:0.09498,x:0.1989,b:0,tap:1},{from:6,to:12,r:0.12291,x:0.25581,b:0,tap:1},{from:6,to:13,r:0.06615,x:0.13027,b:0,tap:1},{from:7,to:8,r:0,x:0.17615,b:0,tap:1},{from:7,to:9,r:0.11001,x:0.2064,b:0,tap:1},{from:9,to:10,r:0.03181,x:0.0845,b:0,tap:1},{from:9,to:14,r:0.12711,x:0.27038,b:0,tap:1},{from:10,to:11,r:0.08205,x:0.19207,b:0,tap:1},{from:12,to:13,r:0.22092,x:0.19988,b:0,tap:1},{from:13,to:14,r:0.17093,x:0.34802,b:0,tap:1}]
+    },
+    case30: { name: "IEEE 30母線", baseMVA: 100,
+        bus: [{type:3,Pd:0,Qd:0,Pg:260.2,Vm:1.06,Va:0},{type:2,Pd:21.7,Qd:12.7,Pg:40,Vm:1.043,Va:-5.48},{type:1,Pd:2.4,Qd:1.2,Pg:0,Vm:1.021,Va:-7.96},{type:1,Pd:7.6,Qd:1.6,Pg:0,Vm:1.012,Va:-9.62},{type:2,Pd:94.2,Qd:19,Pg:0,Vm:1.01,Va:-14.37},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.01,Va:-11.34},{type:1,Pd:22.8,Qd:10.9,Pg:0,Vm:1.002,Va:-13.12},{type:2,Pd:30,Qd:30,Pg:0,Vm:1.01,Va:-12.1},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.051,Va:-14.38},{type:1,Pd:5.8,Qd:2,Pg:0,Vm:1.045,Va:-15.97},{type:2,Pd:0,Qd:0,Pg:0,Vm:1.082,Va:-14.39},{type:1,Pd:11.2,Qd:7.5,Pg:0,Vm:1.057,Va:-15.24},{type:2,Pd:0,Qd:0,Pg:0,Vm:1.071,Va:-15.24},{type:1,Pd:6.2,Qd:1.6,Pg:0,Vm:1.042,Va:-16.13},{type:1,Pd:8.2,Qd:2.5,Pg:0,Vm:1.038,Va:-16.22},{type:1,Pd:3.5,Qd:1.8,Pg:0,Vm:1.045,Va:-15.83},{type:1,Pd:9,Qd:5.8,Pg:0,Vm:1.04,Va:-16.14},{type:1,Pd:3.2,Qd:0.9,Pg:0,Vm:1.028,Va:-16.82},{type:1,Pd:9.5,Qd:3.4,Pg:0,Vm:1.026,Va:-17},{type:1,Pd:2.2,Qd:0.7,Pg:0,Vm:1.03,Va:-16.8},{type:1,Pd:17.5,Qd:11.2,Pg:0,Vm:1.033,Va:-16.42},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.033,Va:-16.41},{type:1,Pd:3.2,Qd:1.6,Pg:0,Vm:1.027,Va:-16.61},{type:1,Pd:8.7,Qd:6.7,Pg:0,Vm:1.021,Va:-16.78},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.017,Va:-16.35},{type:1,Pd:3.5,Qd:2.3,Pg:0,Vm:1.0,Va:-16.77},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.023,Va:-15.82},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.007,Va:-11.97},{type:1,Pd:2.4,Qd:0.9,Pg:0,Vm:1.003,Va:-17.06},{type:1,Pd:10.6,Qd:1.9,Pg:0,Vm:0.992,Va:-17.94}],
+        branch: [{from:1,to:2,r:0.0192,x:0.0575,b:0.0528,tap:1},{from:1,to:3,r:0.0452,x:0.1852,b:0.0408,tap:1},{from:2,to:4,r:0.057,x:0.1737,b:0.0368,tap:1},{from:3,to:4,r:0.0132,x:0.0379,b:0.0084,tap:1},{from:2,to:5,r:0.0472,x:0.1983,b:0.0418,tap:1},{from:2,to:6,r:0.0581,x:0.1763,b:0.0374,tap:1},{from:4,to:6,r:0.0119,x:0.0414,b:0.009,tap:1},{from:5,to:7,r:0.046,x:0.116,b:0.0204,tap:1},{from:6,to:7,r:0.0267,x:0.082,b:0.017,tap:1},{from:6,to:8,r:0.012,x:0.042,b:0.009,tap:1},{from:6,to:9,r:0,x:0.208,b:0,tap:0.978},{from:6,to:10,r:0,x:0.556,b:0,tap:0.969},{from:9,to:11,r:0,x:0.208,b:0,tap:1},{from:9,to:10,r:0,x:0.11,b:0,tap:1},{from:4,to:12,r:0,x:0.256,b:0,tap:0.932},{from:12,to:13,r:0,x:0.14,b:0,tap:1},{from:12,to:14,r:0.1231,x:0.2559,b:0,tap:1},{from:12,to:15,r:0.0662,x:0.1304,b:0,tap:1},{from:12,to:16,r:0.0945,x:0.1987,b:0,tap:1},{from:14,to:15,r:0.221,x:0.1997,b:0,tap:1},{from:16,to:17,r:0.0524,x:0.1923,b:0,tap:1},{from:15,to:18,r:0.1073,x:0.2185,b:0,tap:1},{from:18,to:19,r:0.0639,x:0.1292,b:0,tap:1},{from:19,to:20,r:0.034,x:0.068,b:0,tap:1},{from:10,to:20,r:0.0936,x:0.209,b:0,tap:1},{from:10,to:17,r:0.0324,x:0.0845,b:0,tap:1},{from:10,to:21,r:0.0348,x:0.0749,b:0,tap:1},{from:10,to:22,r:0.0727,x:0.1499,b:0,tap:1},{from:21,to:22,r:0.0116,x:0.0236,b:0,tap:1},{from:15,to:23,r:0.1,x:0.202,b:0,tap:1},{from:22,to:24,r:0.115,x:0.179,b:0,tap:1},{from:23,to:24,r:0.132,x:0.27,b:0,tap:1},{from:24,to:25,r:0.1885,x:0.3292,b:0,tap:1},{from:25,to:26,r:0.2544,x:0.38,b:0,tap:1},{from:25,to:27,r:0.1093,x:0.2087,b:0,tap:1},{from:28,to:27,r:0,x:0.396,b:0,tap:0.968},{from:27,to:29,r:0.2198,x:0.4153,b:0,tap:1},{from:27,to:30,r:0.3202,x:0.6027,b:0,tap:1},{from:29,to:30,r:0.2399,x:0.4533,b:0,tap:1},{from:8,to:28,r:0.0636,x:0.2,b:0.0428,tap:1},{from:6,to:28,r:0.0169,x:0.0599,b:0.013,tap:1}]
+    },
+    dist13: { name: "13ノード配電", baseMVA: 1,
+        bus: [{type:3,Pd:0,Qd:0,Pg:0,Vm:1.0,Va:0},{type:1,Pd:0.4,Qd:0.29,Pg:0,Vm:0.997,Va:-0.1},{type:1,Pd:0.17,Qd:0.125,Pg:0,Vm:0.983,Va:-0.35},{type:1,Pd:0.4,Qd:0.29,Pg:0,Vm:0.976,Va:-0.53},{type:1,Pd:0.17,Qd:0.08,Pg:0,Vm:0.968,Va:-0.7},{type:1,Pd:0.23,Qd:0.132,Pg:0,Vm:0.961,Va:-0.86},{type:1,Pd:0.128,Qd:0.086,Pg:0,Vm:0.958,Va:-0.95},{type:1,Pd:0.17,Qd:0.151,Pg:0,Vm:0.952,Va:-1.12},{type:1,Pd:0.485,Qd:0.19,Pg:0,Vm:0.949,Va:-1.23},{type:1,Pd:0.068,Qd:0.046,Pg:0,Vm:0.945,Va:-1.37},{type:1,Pd:0.29,Qd:0.212,Pg:0,Vm:0.943,Va:-1.46},{type:1,Pd:0.17,Qd:0.08,Pg:0,Vm:0.941,Va:-1.55},{type:1,Pd:0.128,Qd:0.086,Pg:0,Vm:0.94,Va:-1.6}],
+        branch: [{from:1,to:2,r:0.001938,x:0.006,b:0,tap:1},{from:2,to:3,r:0.00592,x:0.0196,b:0,tap:1},{from:3,to:4,r:0.00468,x:0.0158,b:0,tap:1},{from:4,to:5,r:0.00559,x:0.0173,b:0,tap:1},{from:5,to:6,r:0.00558,x:0.0174,b:0,tap:1},{from:6,to:7,r:0.00299,x:0.01,b:0,tap:1},{from:7,to:8,r:0.00769,x:0.0254,b:0,tap:1},{from:8,to:9,r:0.00315,x:0.0108,b:0,tap:1},{from:9,to:10,r:0.00745,x:0.0244,b:0,tap:1},{from:10,to:11,r:0.00357,x:0.0117,b:0,tap:1},{from:11,to:12,r:0.00579,x:0.019,b:0,tap:1},{from:12,to:13,r:0.003,x:0.01,b:0,tap:1}]
+    },
+    dist33: { name: "33ノード配電", baseMVA: 100,
+        bus: [{type:3,Pd:0,Qd:0,Pg:0,Vm:1.0,Va:0},{type:1,Pd:0.1,Qd:0.06,Pg:0,Vm:0.997,Va:-0.02},{type:1,Pd:0.09,Qd:0.04,Pg:0,Vm:0.983,Va:-0.09},{type:1,Pd:0.12,Qd:0.08,Pg:0,Vm:0.976,Va:-0.15},{type:1,Pd:0.06,Qd:0.03,Pg:0,Vm:0.968,Va:-0.2},{type:1,Pd:0.06,Qd:0.02,Pg:0,Vm:0.95,Va:-0.31},{type:1,Pd:0.2,Qd:0.1,Pg:0,Vm:0.946,Va:-0.49},{type:1,Pd:0.2,Qd:0.1,Pg:0,Vm:0.932,Va:-0.61},{type:1,Pd:0.06,Qd:0.02,Pg:0,Vm:0.926,Va:-0.7},{type:1,Pd:0.06,Qd:0.02,Pg:0,Vm:0.92,Va:-0.78},{type:1,Pd:0.045,Qd:0.03,Pg:0,Vm:0.919,Va:-0.79},{type:1,Pd:0.06,Qd:0.035,Pg:0,Vm:0.918,Va:-0.81},{type:1,Pd:0.06,Qd:0.035,Pg:0,Vm:0.912,Va:-0.89},{type:1,Pd:0.12,Qd:0.08,Pg:0,Vm:0.909,Va:-0.94},{type:1,Pd:0.06,Qd:0.01,Pg:0,Vm:0.908,Va:-0.97},{type:1,Pd:0.06,Qd:0.02,Pg:0,Vm:0.907,Va:-1},{type:1,Pd:0.06,Qd:0.02,Pg:0,Vm:0.904,Va:-1.05},{type:1,Pd:0.09,Qd:0.04,Pg:0,Vm:0.904,Va:-1.07},{type:1,Pd:0.09,Qd:0.04,Pg:0,Vm:0.997,Va:-0.03},{type:1,Pd:0.09,Qd:0.04,Pg:0,Vm:0.993,Va:-0.1},{type:1,Pd:0.09,Qd:0.04,Pg:0,Vm:0.992,Va:-0.11},{type:1,Pd:0.09,Qd:0.04,Pg:0,Vm:0.992,Va:-0.12},{type:1,Pd:0.09,Qd:0.05,Pg:0,Vm:0.979,Va:-0.15},{type:1,Pd:0.42,Qd:0.2,Pg:0,Vm:0.973,Va:-0.22},{type:1,Pd:0.42,Qd:0.2,Pg:0,Vm:0.969,Va:-0.27},{type:1,Pd:0.06,Qd:0.025,Pg:0,Vm:0.948,Va:-0.32},{type:1,Pd:0.06,Qd:0.025,Pg:0,Vm:0.945,Va:-0.35},{type:1,Pd:0.06,Qd:0.02,Pg:0,Vm:0.934,Va:-0.47},{type:1,Pd:0.12,Qd:0.07,Pg:0,Vm:0.926,Va:-0.56},{type:1,Pd:0.2,Qd:0.6,Pg:0,Vm:0.922,Va:-0.6},{type:1,Pd:0.15,Qd:0.07,Pg:0,Vm:0.918,Va:-0.68},{type:1,Pd:0.21,Qd:0.1,Pg:0,Vm:0.917,Va:-0.72},{type:1,Pd:0.06,Qd:0.04,Pg:0,Vm:0.917,Va:-0.74}],
+        branch: [{from:1,to:2,r:0.0922,x:0.047,b:0,tap:1},{from:2,to:3,r:0.493,x:0.2511,b:0,tap:1},{from:3,to:4,r:0.366,x:0.1864,b:0,tap:1},{from:4,to:5,r:0.3811,x:0.1941,b:0,tap:1},{from:5,to:6,r:0.819,x:0.707,b:0,tap:1},{from:6,to:7,r:0.1872,x:0.6188,b:0,tap:1},{from:7,to:8,r:0.7114,x:0.2351,b:0,tap:1},{from:8,to:9,r:1.03,x:0.74,b:0,tap:1},{from:9,to:10,r:1.044,x:0.74,b:0,tap:1},{from:10,to:11,r:0.1966,x:0.065,b:0,tap:1},{from:11,to:12,r:0.3744,x:0.1238,b:0,tap:1},{from:12,to:13,r:1.468,x:1.155,b:0,tap:1},{from:13,to:14,r:0.5416,x:0.7129,b:0,tap:1},{from:14,to:15,r:0.591,x:0.526,b:0,tap:1},{from:15,to:16,r:0.7463,x:0.545,b:0,tap:1},{from:16,to:17,r:1.289,x:1.721,b:0,tap:1},{from:17,to:18,r:0.732,x:0.574,b:0,tap:1},{from:2,to:19,r:0.164,x:0.1565,b:0,tap:1},{from:19,to:20,r:1.5042,x:1.3554,b:0,tap:1},{from:20,to:21,r:0.4095,x:0.4784,b:0,tap:1},{from:21,to:22,r:0.7089,x:0.9373,b:0,tap:1},{from:3,to:23,r:0.4512,x:0.3083,b:0,tap:1},{from:23,to:24,r:0.898,x:0.7091,b:0,tap:1},{from:24,to:25,r:0.896,x:0.7011,b:0,tap:1},{from:6,to:26,r:0.203,x:0.1034,b:0,tap:1},{from:26,to:27,r:0.2842,x:0.1447,b:0,tap:1},{from:27,to:28,r:1.059,x:0.9337,b:0,tap:1},{from:28,to:29,r:0.8042,x:0.7006,b:0,tap:1},{from:29,to:30,r:0.5075,x:0.2585,b:0,tap:1},{from:30,to:31,r:0.9744,x:0.963,b:0,tap:1},{from:31,to:32,r:0.3105,x:0.3619,b:0,tap:1},{from:32,to:33,r:0.341,x:0.5302,b:0,tap:1}]
+    },
+    dist69: { name: "69ノード配電", baseMVA: 100,
+        bus: [{type:3,Pd:0,Qd:0,Pg:0,Vm:1.0,Va:0},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.0,Va:0},{type:1,Pd:0,Qd:0,Pg:0,Vm:1.0,Va:0},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9999,Va:0},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.999,Va:-0.01},{type:1,Pd:0.0026,Qd:0.0022,Pg:0,Vm:0.9901,Va:-0.1},{type:1,Pd:0.0404,Qd:0.03,Pg:0,Vm:0.9808,Va:-0.19},{type:1,Pd:0.075,Qd:0.054,Pg:0,Vm:0.9786,Va:-0.21},{type:1,Pd:0.03,Qd:0.022,Pg:0,Vm:0.9775,Va:-0.23},{type:1,Pd:0.028,Qd:0.019,Pg:0,Vm:0.9724,Va:-0.33},{type:1,Pd:0.145,Qd:0.104,Pg:0,Vm:0.9713,Va:-0.35},{type:1,Pd:0.145,Qd:0.104,Pg:0,Vm:0.9682,Va:-0.41},{type:1,Pd:0.008,Qd:0.0055,Pg:0,Vm:0.9653,Va:-0.47},{type:1,Pd:0.008,Qd:0.0055,Pg:0,Vm:0.9624,Va:-0.53},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9595,Va:-0.59},{type:1,Pd:0.0455,Qd:0.03,Pg:0,Vm:0.959,Va:-0.6},{type:1,Pd:0.06,Qd:0.035,Pg:0,Vm:0.9581,Va:-0.61},{type:1,Pd:0.06,Qd:0.035,Pg:0,Vm:0.9581,Va:-0.61},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9579,Va:-0.62},{type:1,Pd:0.001,Qd:0.0006,Pg:0,Vm:0.9576,Va:-0.62},{type:1,Pd:0.114,Qd:0.081,Pg:0,Vm:0.9573,Va:-0.63},{type:1,Pd:0.0053,Qd:0.0035,Pg:0,Vm:0.9573,Va:-0.63},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9572,Va:-0.63},{type:1,Pd:0.028,Qd:0.02,Pg:0,Vm:0.9571,Va:-0.63},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9569,Va:-0.64},{type:1,Pd:0.014,Qd:0.01,Pg:0,Vm:0.9568,Va:-0.64},{type:1,Pd:0.014,Qd:0.01,Pg:0,Vm:0.9568,Va:-0.64},{type:1,Pd:0.026,Qd:0.0186,Pg:0,Vm:0.9999,Va:0},{type:1,Pd:0.026,Qd:0.0186,Pg:0,Vm:0.9997,Va:0},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9976,Va:-0.01},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9972,Va:-0.01},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9958,Va:-0.02},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9918,Va:-0.05},{type:1,Pd:0.014,Qd:0.01,Pg:0,Vm:0.9873,Va:-0.09},{type:1,Pd:0.0195,Qd:0.014,Pg:0,Vm:0.9834,Va:-0.12},{type:1,Pd:0.006,Qd:0.004,Pg:0,Vm:0.9999,Va:0},{type:1,Pd:0.026,Qd:0.01855,Pg:0,Vm:0.9997,Va:0},{type:1,Pd:0.026,Qd:0.01855,Pg:0,Vm:0.9993,Va:-0.01},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9991,Va:-0.01},{type:1,Pd:0.024,Qd:0.017,Pg:0,Vm:0.9991,Va:-0.01},{type:1,Pd:0.024,Qd:0.017,Pg:0,Vm:0.9974,Va:-0.05},{type:1,Pd:0.0012,Qd:0.001,Pg:0,Vm:0.9972,Va:-0.06},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9971,Va:-0.06},{type:1,Pd:0.006,Qd:0.0043,Pg:0,Vm:0.9971,Va:-0.06},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.997,Va:-0.06},{type:1,Pd:0.03922,Qd:0.0263,Pg:0,Vm:0.997,Va:-0.07},{type:1,Pd:0.03922,Qd:0.0263,Pg:0,Vm:0.9999,Va:0},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9995,Va:-0.01},{type:1,Pd:0.079,Qd:0.0564,Pg:0,Vm:0.9944,Va:-0.12},{type:1,Pd:0.3847,Qd:0.2745,Pg:0,Vm:0.9943,Va:-0.13},{type:1,Pd:0.3847,Qd:0.2745,Pg:0,Vm:0.979,Va:-0.21},{type:1,Pd:0.0405,Qd:0.0283,Pg:0,Vm:0.9788,Va:-0.21},{type:1,Pd:0.0036,Qd:0.0027,Pg:0,Vm:0.9769,Va:-0.24},{type:1,Pd:0.00435,Qd:0.0035,Pg:0,Vm:0.9758,Va:-0.27},{type:1,Pd:0.0264,Qd:0.019,Pg:0,Vm:0.9747,Va:-0.3},{type:1,Pd:0.024,Qd:0.0172,Pg:0,Vm:0.9738,Va:-0.32},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9699,Va:-0.44},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9675,Va:-0.54},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9667,Va:-0.57},{type:1,Pd:0.1,Qd:0.072,Pg:0,Vm:0.9659,Va:-0.61},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9651,Va:-0.67},{type:1,Pd:1.244,Qd:0.888,Pg:0,Vm:0.965,Va:-0.68},{type:1,Pd:0.032,Qd:0.023,Pg:0,Vm:0.9649,Va:-0.68},{type:1,Pd:0,Qd:0,Pg:0,Vm:0.9648,Va:-0.69},{type:1,Pd:0.227,Qd:0.162,Pg:0,Vm:0.9645,Va:-0.7},{type:1,Pd:0.059,Qd:0.042,Pg:0,Vm:0.9713,Va:-0.35},{type:1,Pd:0.018,Qd:0.013,Pg:0,Vm:0.9713,Va:-0.35},{type:1,Pd:0.018,Qd:0.013,Pg:0,Vm:0.968,Va:-0.42},{type:1,Pd:0.028,Qd:0.02,Pg:0,Vm:0.968,Va:-0.42}],
+        branch: [{from:1,to:2,r:0.0005,x:0.0012,b:0,tap:1},{from:2,to:3,r:0.0005,x:0.0012,b:0,tap:1},{from:3,to:4,r:0.0015,x:0.0036,b:0,tap:1},{from:4,to:5,r:0.0251,x:0.0294,b:0,tap:1},{from:5,to:6,r:0.366,x:0.1864,b:0,tap:1},{from:6,to:7,r:0.3811,x:0.1941,b:0,tap:1},{from:7,to:8,r:0.0922,x:0.047,b:0,tap:1},{from:8,to:9,r:0.0493,x:0.0251,b:0,tap:1},{from:9,to:10,r:0.819,x:0.2707,b:0,tap:1},{from:10,to:11,r:0.1872,x:0.0619,b:0,tap:1},{from:11,to:12,r:0.7114,x:0.2351,b:0,tap:1},{from:12,to:13,r:1.03,x:0.34,b:0,tap:1},{from:13,to:14,r:1.044,x:0.345,b:0,tap:1},{from:14,to:15,r:1.058,x:0.3496,b:0,tap:1},{from:15,to:16,r:0.1966,x:0.065,b:0,tap:1},{from:16,to:17,r:0.3744,x:0.1238,b:0,tap:1},{from:17,to:18,r:0.0047,x:0.0016,b:0,tap:1},{from:18,to:19,r:0.3276,x:0.1083,b:0,tap:1},{from:19,to:20,r:0.2106,x:0.069,b:0,tap:1},{from:20,to:21,r:0.3416,x:0.1129,b:0,tap:1},{from:21,to:22,r:0.014,x:0.0046,b:0,tap:1},{from:22,to:23,r:0.1591,x:0.0526,b:0,tap:1},{from:23,to:24,r:0.3463,x:0.1145,b:0,tap:1},{from:24,to:25,r:0.7488,x:0.2475,b:0,tap:1},{from:25,to:26,r:0.3089,x:0.1021,b:0,tap:1},{from:26,to:27,r:0.1732,x:0.0572,b:0,tap:1},{from:3,to:28,r:0.0044,x:0.0108,b:0,tap:1},{from:28,to:29,r:0.064,x:0.1565,b:0,tap:1},{from:29,to:30,r:0.3978,x:0.1315,b:0,tap:1},{from:30,to:31,r:0.0702,x:0.0232,b:0,tap:1},{from:31,to:32,r:0.351,x:0.116,b:0,tap:1},{from:32,to:33,r:0.839,x:0.2816,b:0,tap:1},{from:33,to:34,r:1.708,x:0.5646,b:0,tap:1},{from:34,to:35,r:1.474,x:0.4873,b:0,tap:1},{from:4,to:36,r:0.0044,x:0.0108,b:0,tap:1},{from:36,to:37,r:0.064,x:0.1565,b:0,tap:1},{from:37,to:38,r:0.1053,x:0.123,b:0,tap:1},{from:38,to:39,r:0.0304,x:0.0355,b:0,tap:1},{from:39,to:40,r:0.0018,x:0.0021,b:0,tap:1},{from:40,to:41,r:0.7283,x:0.8509,b:0,tap:1},{from:41,to:42,r:0.31,x:0.3623,b:0,tap:1},{from:42,to:43,r:0.041,x:0.0478,b:0,tap:1},{from:43,to:44,r:0.0092,x:0.0116,b:0,tap:1},{from:44,to:45,r:0.1089,x:0.1373,b:0,tap:1},{from:45,to:46,r:0.0009,x:0.0012,b:0,tap:1},{from:4,to:47,r:0.0034,x:0.0084,b:0,tap:1},{from:47,to:48,r:0.0851,x:0.2083,b:0,tap:1},{from:48,to:49,r:0.2898,x:0.7091,b:0,tap:1},{from:49,to:50,r:0.0822,x:0.2011,b:0,tap:1},{from:8,to:51,r:0.0928,x:0.0473,b:0,tap:1},{from:51,to:52,r:0.3319,x:0.1114,b:0,tap:1},{from:9,to:53,r:0.174,x:0.0886,b:0,tap:1},{from:53,to:54,r:0.203,x:0.1034,b:0,tap:1},{from:54,to:55,r:0.2842,x:0.1447,b:0,tap:1},{from:55,to:56,r:0.2813,x:0.1433,b:0,tap:1},{from:56,to:57,r:1.59,x:0.5337,b:0,tap:1},{from:57,to:58,r:0.7837,x:0.263,b:0,tap:1},{from:58,to:59,r:0.3042,x:0.1006,b:0,tap:1},{from:59,to:60,r:0.3861,x:0.1172,b:0,tap:1},{from:60,to:61,r:0.5075,x:0.2585,b:0,tap:1},{from:61,to:62,r:0.0974,x:0.0496,b:0,tap:1},{from:62,to:63,r:0.145,x:0.0738,b:0,tap:1},{from:63,to:64,r:0.7105,x:0.3619,b:0,tap:1},{from:64,to:65,r:1.041,x:0.5302,b:0,tap:1},{from:11,to:66,r:0.2012,x:0.0611,b:0,tap:1},{from:66,to:67,r:0.0047,x:0.0014,b:0,tap:1},{from:12,to:68,r:0.7394,x:0.2444,b:0,tap:1},{from:68,to:69,r:0.0047,x:0.0016,b:0,tap:1}]
+    }
+};
+
+// ===== Initialization =====
+document.addEventListener('DOMContentLoaded', () => {
+    canvas = document.getElementById('networkCanvas');
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    setupCanvasInteraction();
+    loadCase('case9');
+    log('info', '初期化完了 - IEEE 9母線系統をロード');
+});
+
+function resizeCanvas() { const c = canvas.parentElement; canvas.width = c.clientWidth; canvas.height = c.clientHeight; drawNetwork(); }
+function setupCanvasInteraction() {
+    let isDragging = false, lastX, lastY;
+    canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+    canvas.addEventListener('mousemove', e => { if (isDragging) { panX += e.clientX - lastX; panY += e.clientY - lastY; lastX = e.clientX; lastY = e.clientY; drawNetwork(); } });
+    canvas.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mouseleave', () => isDragging = false);
+    canvas.addEventListener('wheel', e => { e.preventDefault(); e.deltaY < 0 ? zoomIn() : zoomOut(); });
+}
+
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
+    document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+function setStatus(type, text) { document.getElementById('statusIndicator').className = 'status status-' + type; document.getElementById('statusText').textContent = text; }
+function log(type, msg) { const el = document.getElementById('console'); const line = document.createElement('div'); line.className = 'console-line ' + type; line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg; el.appendChild(line); el.scrollTop = el.scrollHeight; }
+
+function loadCase(name) {
+    const c = sampleCases[name]; if (!c) return;
+    busData = JSON.parse(JSON.stringify(c.bus));
+    branchData = JSON.parse(JSON.stringify(c.branch));
+    document.getElementById('baseMVA').value = c.baseMVA || 100;
+    updateBusTable(); updateBranchTable(); drawNetwork();
+    results = null; timeseriesResults = [];
+    document.getElementById('timeseriesResultCard').style.display = 'none';
+    document.getElementById('busResultBody').innerHTML = '';
+    document.getElementById('branchResultBody').innerHTML = '';
+    log('info', c.name + ' をロード (' + busData.length + '母線, ' + branchData.length + '線路)');
+}
+
+function updateBusTable() {
+    const tbody = document.getElementById('busTableBody'); tbody.innerHTML = '';
+    busData.forEach((bus, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td>' + (i+1) + '</td><td><select onchange="busData['+i+'].type=+this.value;drawNetwork()"><option value="1"' + (bus.type===1?' selected':'') + '>PQ</option><option value="2"' + (bus.type===2?' selected':'') + '>PV</option><option value="3"' + (bus.type===3?' selected':'') + '>Slack</option></select></td><td><input type="number" value="' + (bus.Pd||0) + '" onchange="busData['+i+'].Pd=+this.value"></td><td><input type="number" value="' + (bus.Qd||0) + '" onchange="busData['+i+'].Qd=+this.value"></td><td><input type="number" value="' + (bus.Pg||0) + '" onchange="busData['+i+'].Pg=+this.value"></td><td><input type="number" value="' + (bus.Vm||1) + '" step="0.001" onchange="busData['+i+'].Vm=+this.value"></td><td><input type="number" value="' + (bus.Va||0) + '" step="0.1" onchange="busData['+i+'].Va=+this.value"></td>';
+        tbody.appendChild(row);
+    });
+}
+
+function updateBranchTable() {
+    const tbody = document.getElementById('branchTableBody'); tbody.innerHTML = '';
+    branchData.forEach((br, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td><input type="number" value="' + br.from + '" onchange="branchData['+i+'].from=+this.value;drawNetwork()"></td><td><input type="number" value="' + br.to + '" onchange="branchData['+i+'].to=+this.value;drawNetwork()"></td><td><input type="number" value="' + (br.r||0) + '" step="0.0001" onchange="branchData['+i+'].r=+this.value"></td><td><input type="number" value="' + (br.x||0) + '" step="0.0001" onchange="branchData['+i+'].x=+this.value"></td><td><input type="number" value="' + (br.b||0) + '" step="0.0001" onchange="branchData['+i+'].b=+this.value"></td><td><input type="number" value="' + (br.tap||1) + '" step="0.001" onchange="branchData['+i+'].tap=+this.value"></td>';
+        tbody.appendChild(row);
+    });
+}
+
+function addBusRow() { busData.push({type:1,Pd:0,Qd:0,Pg:0,Vm:1,Va:0}); updateBusTable(); drawNetwork(); }
+function removeBusRow() { if(busData.length>1) { busData.pop(); updateBusTable(); drawNetwork(); } }
+function addBranchRow() { branchData.push({from:1,to:2,r:0.01,x:0.1,b:0,tap:1}); updateBranchTable(); drawNetwork(); }
+function removeBranchRow() { if(branchData.length>0) { branchData.pop(); updateBranchTable(); drawNetwork(); } }
+
+function importBusCSV(input) {
+    const file = input.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const lines = e.target.result.trim().split('\n');
+        const h = lines[0].toLowerCase().split(',').map(s=>s.trim());
+        busData = [];
+        for(let i=1; i<lines.length; i++) {
+            const v = lines[i].split(',').map(s=>s.trim());
+            busData.push({ type: parseInt(v[h.indexOf('type')])||1, Pd: parseFloat(v[h.indexOf('pd')])||0, Qd: parseFloat(v[h.indexOf('qd')])||0, Pg: parseFloat(v[h.indexOf('pg')])||0, Vm: parseFloat(v[h.indexOf('vm')])||1, Va: parseFloat(v[h.indexOf('va_deg')]||v[h.indexOf('va')])||0 });
+        }
+        updateBusTable(); drawNetwork();
+        log('success', '母線CSV読込完了 (' + busData.length + '母線)');
+    };
+    reader.readAsText(file); input.value = '';
+}
+
+function importBranchCSV(input) {
+    const file = input.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const lines = e.target.result.trim().split('\n');
+        const h = lines[0].toLowerCase().split(',').map(s=>s.trim());
+        branchData = [];
+        for(let i=1; i<lines.length; i++) {
+            const v = lines[i].split(',').map(s=>s.trim());
+            branchData.push({ from: parseInt(v[h.indexOf('from')]), to: parseInt(v[h.indexOf('to')]), r: parseFloat(v[h.indexOf('r')])||0, x: parseFloat(v[h.indexOf('x')])||0.01, b: parseFloat(v[h.indexOf('b')])||0, tap: parseFloat(v[h.indexOf('tap')])||1 });
+        }
+        updateBranchTable(); drawNetwork();
+        log('success', '線路CSV読込完了 (' + branchData.length + '線路)');
+    };
+    reader.readAsText(file); input.value = '';
+}
+
+function exportBusCSV() { let csv = 'bus,type,Pd,Qd,Pg,Vm,Va_deg\n'; busData.forEach((b,i) => csv += (i+1)+','+b.type+','+b.Pd+','+b.Qd+','+(b.Pg||0)+','+(b.Vm||1).toFixed(4)+','+(b.Va||0).toFixed(2)+'\n'); downloadFile(csv, 'bus_data.csv', 'text/csv'); }
+function exportBranchCSV() { let csv = 'from,to,r,x,b,tap\n'; branchData.forEach(br => csv += br.from+','+br.to+','+br.r+','+br.x+','+(br.b||0)+','+(br.tap||1)+'\n'); downloadFile(csv, 'branch_data.csv', 'text/csv'); }
+function downloadFile(content, filename, type) { const blob = new Blob([content], {type}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); }
+
+// ===== Power Flow Solver =====
+function runPowerFlow(loadMult = 1.0, pvGen = 0) {
+    const startTime = performance.now();
+    const baseMVA = parseFloat(document.getElementById('baseMVA').value) || 100;
+    const maxIter = parseInt(document.getElementById('maxIter').value) || 100;
+    const tolerance = parseFloat(document.getElementById('tolerance').value) || 1e-6;
+    const flatStart = document.getElementById('flatStart').checked;
+    const n = busData.length;
+    if (n < 2) return null;
+
+    const Ybus = buildYbus(n, branchData);
+    let Vm = busData.map(b => flatStart ? 1.0 : (b.Vm || 1.0));
+    let Va = busData.map(b => flatStart ? 0 : ((b.Va || 0) * Math.PI / 180));
+    
+    const pq = [], pv = []; let slack = 0;
+    busData.forEach((b, i) => { if (b.type === 1) pq.push(i); else if (b.type === 2) pv.push(i); else slack = i; });
+    
+    const Pspec = busData.map((b,i) => ((b.Pg||0) + (i===Math.floor(n/2)?pvGen:0) - (b.Pd||0)*loadMult) / baseMVA);
+    const Qspec = busData.map(b => -(b.Qd||0)*loadMult / baseMVA);
+    
+    const pvpq = [...pv, ...pq], npvpq = pvpq.length, npq = pq.length;
+    let converged = false, iter = 0, maxMis = Infinity;
+    convergenceHistory = [];
+    
+    for (iter = 0; iter < maxIter; iter++) {
+        const {P, Q} = calcPower(Vm, Va, Ybus, n);
+        const dP = pvpq.map(i => Pspec[i] - P[i]);
+        const dQ = pq.map(i => Qspec[i] - Q[i]);
+        maxMis = Math.max(...dP.map(Math.abs), ...dQ.map(Math.abs));
+        convergenceHistory.push(maxMis);
+        if (maxMis < tolerance) { converged = true; break; }
+        const J = buildJacobian(Vm, Va, Ybus, pq, pv, n);
+        const dx = solveLinear(J, [...dP, ...dQ]);
+        if (!dx) break;
+        for (let k = 0; k < npvpq; k++) Va[pvpq[k]] += dx[k];
+        for (let k = 0; k < npq; k++) Vm[pq[k]] *= (1 + dx[npvpq + k]);
+    }
+    
+    const calcTime = (performance.now() - startTime).toFixed(2);
+    if (converged) {
+        const V = Vm.map((vm, i) => ({re: vm * Math.cos(Va[i]), im: vm * Math.sin(Va[i])}));
+        const res = {V, Vm, Va, converged: true, iterations: iter+1, maxMismatch: maxMis, calcTime, baseMVA};
+        calcBranchFlows(res, V, baseMVA);
+        return res;
+    }
+    return {converged: false, iterations: iter, maxMismatch: maxMis};
+}
+
+function runPowerFlowUI() {
+    setStatus('running', '計算中...');
+    log('info', 'Newton-Raphson 潮流計算開始...');
+    results = runPowerFlow(1.0, 0);
+    if (results && results.converged) {
+        setStatus('converged', '収束');
+        log('success', '収束 (' + results.iterations + '回反復, ' + results.calcTime + 'ms)');
+        busData.forEach((b, i) => { b.Vm = results.Vm[i]; b.Va = results.Va[i] * 180 / Math.PI; });
+        updateBusTable();
+        updateResults();
+        drawVoltageChart();
+    } else {
+        setStatus('failed', '非収束');
+        log('error', '非収束 (' + (results?.iterations||0) + '回, maxMis=' + (results?.maxMismatch||0).toExponential(2) + ')');
+    }
+    drawNetwork();
+}
+
+function buildYbus(n, branches) {
+    const Y = Array(n).fill(null).map(() => Array(n).fill(null).map(() => ({re:0, im:0})));
+    branches.forEach(br => {
+        const i = br.from - 1, j = br.to - 1, tap = br.tap || 1;
+        if (i < 0 || j < 0 || i >= n || j >= n) return;
+        const r = br.r || 0, x = br.x || 0.001, z2 = r*r + x*x;
+        if (z2 < 1e-20) return;
+        const g = r / z2, b = -x / z2;
+        Y[i][i].re += g/(tap*tap); Y[i][i].im += (b + (br.b||0)/2)/(tap*tap);
+        Y[j][j].re += g; Y[j][j].im += b + (br.b||0)/2;
+        Y[i][j].re -= g/tap; Y[i][j].im -= b/tap;
+        Y[j][i].re -= g/tap; Y[j][i].im -= b/tap;
+    });
+    return Y;
+}
+
+function calcPower(Vm, Va, Ybus, n) {
+    const P = Array(n).fill(0), Q = Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            const tij = Va[i] - Va[j];
+            P[i] += Vm[i] * Vm[j] * (Ybus[i][j].re * Math.cos(tij) + Ybus[i][j].im * Math.sin(tij));
+            Q[i] += Vm[i] * Vm[j] * (Ybus[i][j].re * Math.sin(tij) - Ybus[i][j].im * Math.cos(tij));
+        }
+    }
+    return {P, Q};
+}
+
+function buildJacobian(Vm, Va, Ybus, pq, pv, n) {
+    const pvpq = [...pv, ...pq], npvpq = pvpq.length, npq = pq.length, dim = npvpq + npq;
+    const J = Array(dim).fill(null).map(() => Array(dim).fill(0));
+    const {P, Q} = calcPower(Vm, Va, Ybus, n);
+    for (let ki = 0; ki < npvpq; ki++) {
+        const i = pvpq[ki];
+        for (let kj = 0; kj < npvpq; kj++) {
+            const j = pvpq[kj];
+            if (i === j) J[ki][kj] = -Q[i] - Ybus[i][i].im * Vm[i]**2;
+            else { const tij = Va[i] - Va[j]; J[ki][kj] = Vm[i] * Vm[j] * (Ybus[i][j].re * Math.sin(tij) - Ybus[i][j].im * Math.cos(tij)); }
+        }
+        for (let kj = 0; kj < npq; kj++) {
+            const j = pq[kj];
+            if (i === j) J[ki][npvpq+kj] = P[i]/Vm[i] + Ybus[i][i].re * Vm[i];
+            else { const tij = Va[i] - Va[j]; J[ki][npvpq+kj] = Vm[i] * (Ybus[i][j].re * Math.cos(tij) + Ybus[i][j].im * Math.sin(tij)); }
+        }
+    }
+    for (let ki = 0; ki < npq; ki++) {
+        const i = pq[ki];
+        for (let kj = 0; kj < npvpq; kj++) {
+            const j = pvpq[kj];
+            if (i === j) J[npvpq+ki][kj] = P[i] - Ybus[i][i].re * Vm[i]**2;
+            else { const tij = Va[i] - Va[j]; J[npvpq+ki][kj] = -Vm[i] * Vm[j] * (Ybus[i][j].re * Math.cos(tij) + Ybus[i][j].im * Math.sin(tij)); }
+        }
+        for (let kj = 0; kj < npq; kj++) {
+            const j = pq[kj];
+            if (i === j) J[npvpq+ki][npvpq+kj] = Q[i]/Vm[i] - Ybus[i][i].im * Vm[i];
+            else { const tij = Va[i] - Va[j]; J[npvpq+ki][npvpq+kj] = Vm[i] * (Ybus[i][j].re * Math.sin(tij) - Ybus[i][j].im * Math.cos(tij)); }
+        }
+    }
+    return J;
+}
+
+function solveLinear(A, b) {
+    const n = b.length; if (n === 0) return [];
+    const Ab = A.map((row, i) => [...row, b[i]]);
+    for (let i = 0; i < n; i++) {
+        let maxRow = i;
+        for (let k = i+1; k < n; k++) if (Math.abs(Ab[k][i]) > Math.abs(Ab[maxRow][i])) maxRow = k;
+        [Ab[i], Ab[maxRow]] = [Ab[maxRow], Ab[i]];
+        if (Math.abs(Ab[i][i]) < 1e-12) return null;
+        for (let k = i+1; k < n; k++) { const f = Ab[k][i] / Ab[i][i]; for (let j = i; j <= n; j++) Ab[k][j] -= f * Ab[i][j]; }
+    }
+    const x = Array(n).fill(0);
+    for (let i = n-1; i >= 0; i--) { x[i] = Ab[i][n]; for (let j = i+1; j < n; j++) x[i] -= Ab[i][j] * x[j]; x[i] /= Ab[i][i]; }
+    return x;
+}
+
+function calcBranchFlows(res, V, baseMVA) {
+    res.branchFlows = branchData.map(br => {
+        const i = br.from - 1, j = br.to - 1, tap = br.tap || 1;
+        if (i < 0 || j < 0 || i >= V.length || j >= V.length) return {from:br.from,to:br.to,Pij:0,Qij:0,Ploss:0};
+        const Vi = V[i], Vj = V[j], r = br.r || 0, x = br.x || 0.001, z2 = r*r + x*x;
+        if (z2 < 1e-20) return {from:br.from,to:br.to,Pij:0,Qij:0,Ploss:0};
+        const g = r/z2, b = -x/z2;
+        const IijRe = g/tap*(Vi.re/tap - Vj.re) - b/tap*(Vi.im/tap - Vj.im) + ((br.b||0)/2/(tap*tap))*(-Vi.im);
+        const IijIm = g/tap*(Vi.im/tap - Vj.im) + b/tap*(Vi.re/tap - Vj.re) + ((br.b||0)/2/(tap*tap))*Vi.re;
+        const IjiRe = g*(Vj.re - Vi.re/tap) - b*(Vj.im - Vi.im/tap) + ((br.b||0)/2)*(-Vj.im);
+        const IjiIm = g*(Vj.im - Vi.im/tap) + b*(Vj.re - Vi.re/tap) + ((br.b||0)/2)*Vj.re;
+        const Pij = (Vi.re*IijRe + Vi.im*IijIm) * baseMVA, Qij = (Vi.im*IijRe - Vi.re*IijIm) * baseMVA;
+        const Pji = (Vj.re*IjiRe + Vj.im*IjiIm) * baseMVA, Qji = (Vj.im*IjiRe - Vj.re*IjiIm) * baseMVA;
+        return {from:br.from, to:br.to, Pij, Qij, Pji, Qji, Ploss:Pij+Pji, Qloss:Qij+Qji};
+    });
+    res.totalPLoss = res.branchFlows.reduce((s,f) => s + (f.Ploss||0), 0);
+    res.totalQLoss = res.branchFlows.reduce((s,f) => s + (f.Qloss||0), 0);
+}
+
+function updateResults() {
+    if (!results || !results.converged) return;
+    const baseMVA = results.baseMVA || parseFloat(document.getElementById('baseMVA').value) || 100;
+    
+    // Summary
+    document.getElementById('totalLoss').innerHTML = (results.totalPLoss||0).toFixed(4) + '<span class="result-unit">MW</span>';
+    document.getElementById('iterCount').textContent = results.iterations || '--';
+    document.getElementById('maxMismatch').textContent = results.maxMismatch ? results.maxMismatch.toExponential(2) : '--';
+    document.getElementById('calcTime').textContent = (results.calcTime||0) + ' ms';
+    
+    // Bus Results Table
+    const n = busData.length;
+    const Ybus = buildYbus(n, branchData);
+    const {P, Q} = calcPower(results.Vm, results.Va, Ybus, n);
+    
+    const busBody = document.getElementById('busResultBody');
+    busBody.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+        const vm = results.Vm[i] || 0;
+        const va = (results.Va[i] || 0) * 180 / Math.PI;
+        const row = document.createElement('tr');
+        row.innerHTML = '<td>' + (i+1) + '</td><td>' + vm.toFixed(4) + '</td><td>' + va.toFixed(2) + '</td><td>' + ((P[i]||0)*baseMVA).toFixed(2) + '</td><td>' + ((Q[i]||0)*baseMVA).toFixed(2) + '</td>';
+        busBody.appendChild(row);
+    }
+    
+    // Branch Results Table
+    const brBody = document.getElementById('branchResultBody');
+    brBody.innerHTML = '';
+    (results.branchFlows||[]).forEach(f => {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td>' + f.from + '</td><td>' + f.to + '</td><td>' + (f.Pij||0).toFixed(2) + '</td><td>' + (f.Qij||0).toFixed(2) + '</td><td>' + (f.Ploss||0).toFixed(4) + '</td>';
+        brBody.appendChild(row);
+    });
+}
+
+// ===== Voltage Profile Chart =====
+function drawVoltageChart() {
+    if (!results || !results.Vm) return;
+    const chart = document.getElementById('voltageChart');
+    const c = chart.getContext('2d');
+    const container = chart.parentElement;
+    chart.width = container.clientWidth - 20;
+    chart.height = container.clientHeight - 20;
+    const w = chart.width, h = chart.height, p = {l: 40, r: 10, t: 10, b: 25};
+    
+    c.clearRect(0, 0, w, h);
+    const n = results.Vm.length;
+    const vMax = parseFloat(document.getElementById('vMax').value) || 1.05;
+    const vMin = parseFloat(document.getElementById('vMin').value) || 0.95;
+    const dataMin = Math.min(...results.Vm, vMin) - 0.02;
+    const dataMax = Math.max(...results.Vm, vMax) + 0.02;
+    
+    const xScale = (w - p.l - p.r) / n;
+    const yScale = (h - p.t - p.b) / (dataMax - dataMin);
+    
+    // Grid and axes
+    c.strokeStyle = '#30363d'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(p.l, p.t); c.lineTo(p.l, h - p.b); c.lineTo(w - p.r, h - p.b); c.stroke();
+    
+    // Voltage limits
+    const yMaxLine = h - p.b - (vMax - dataMin) * yScale;
+    const yMinLine = h - p.b - (vMin - dataMin) * yScale;
+    c.fillStyle = 'rgba(255,71,87,0.1)';
+    c.fillRect(p.l, p.t, w - p.l - p.r, yMaxLine - p.t);
+    c.fillStyle = 'rgba(255,208,0,0.1)';
+    c.fillRect(p.l, yMinLine, w - p.l - p.r, h - p.b - yMinLine);
+    
+    c.setLineDash([5, 5]);
+    c.strokeStyle = '#ff4757'; c.beginPath(); c.moveTo(p.l, yMaxLine); c.lineTo(w - p.r, yMaxLine); c.stroke();
+    c.strokeStyle = '#ffd000'; c.beginPath(); c.moveTo(p.l, yMinLine); c.lineTo(w - p.r, yMinLine); c.stroke();
+    c.setLineDash([]);
+    
+    // Bars
+    let highCount = 0, normalCount = 0, lowCount = 0;
+    const barWidth = Math.max(2, xScale * 0.7);
+    results.Vm.forEach((vm, i) => {
+        const x = p.l + i * xScale + xScale/2 - barWidth/2;
+        const y = h - p.b - (vm - dataMin) * yScale;
+        const barH = (vm - dataMin) * yScale;
+        
+        let color;
+        if (vm > vMax) { color = '#ff4757'; highCount++; }
+        else if (vm < vMin) { color = '#ffd000'; lowCount++; }
+        else { color = '#00ff88'; normalCount++; }
+        
+        c.fillStyle = color;
+        c.fillRect(x, y, barWidth, barH);
+    });
+    
+    // Y-axis labels
+    c.fillStyle = '#8b949e'; c.font = '10px JetBrains Mono'; c.textAlign = 'right';
+    for (let v = Math.ceil(dataMin * 20) / 20; v <= dataMax; v += 0.02) {
+        const y = h - p.b - (v - dataMin) * yScale;
+        c.fillText(v.toFixed(2), p.l - 5, y + 3);
+    }
+    
+    // X-axis labels
+    c.textAlign = 'center';
+    const step = Math.ceil(n / 12);
+    for (let i = 0; i < n; i += step) {
+        const x = p.l + i * xScale + xScale/2;
+        c.fillText((i+1).toString(), x, h - p.b + 15);
+    }
+    
+    // Update counters
+    document.getElementById('vHighCount').textContent = highCount;
+    document.getElementById('vNormalCount').textContent = normalCount;
+    document.getElementById('vLowCount').textContent = lowCount;
+}
+
+// ===== Timeseries Simulation =====
+function getLoadPattern(steps, pattern, loadMin, loadMax) {
+    const range = loadMax - loadMin;
+    switch(pattern) {
+        case 'daily':
+            return Array.from({length: steps}, (_, i) => {
+                const h = (i / steps) * 24;
+                const base = 0.6 + 0.3 * Math.sin((h - 6) * Math.PI / 12);
+                const peak = h >= 9 && h <= 21 ? 0.2 : 0;
+                return loadMin + range * Math.min(1, base + peak);
+            });
+        case 'sine':
+            return Array.from({length: steps}, (_, i) => loadMin + range * (0.5 + 0.5 * Math.sin(2 * Math.PI * i / steps)));
+        case 'step':
+            return Array.from({length: steps}, (_, i) => i < steps/2 ? loadMin : loadMax);
+        case 'random':
+            return Array.from({length: steps}, () => loadMin + range * Math.random());
+        default:
+            return Array.from({length: steps}, () => 1.0);
+    }
+}
+
+function getPVPattern(steps, capacity) {
+    return Array.from({length: steps}, (_, i) => {
+        const h = (i / steps) * 24;
+        if (h < 6 || h > 18) return 0;
+        return capacity * Math.sin((h - 6) * Math.PI / 12);
+    });
+}
+
+async function runTimeseries() {
+    const steps = parseInt(document.getElementById('tsSteps').value) || 24;
+    const pattern = document.getElementById('loadPattern').value;
+    const loadMin = parseFloat(document.getElementById('loadMin').value) || 0.5;
+    const loadMax = parseFloat(document.getElementById('loadMax').value) || 1.2;
+    const includePV = document.getElementById('includePV').checked;
+    const pvCapacity = includePV ? parseFloat(document.getElementById('pvCapacity').value) || 50 : 0;
+    
+    const loadPattern = getLoadPattern(steps, pattern, loadMin, loadMax);
+    const pvPattern = getPVPattern(steps, pvCapacity);
+    
+    timeseriesResults = [];
+    setStatus('running', '時系列計算中...');
+    log('info', '時系列シミュレーション開始 (' + steps + 'ステップ)');
+    
+    const progress = document.getElementById('tsProgress');
+    
+    for (let t = 0; t < steps; t++) {
+        const res = runPowerFlow(loadPattern[t], pvPattern[t]);
+        timeseriesResults.push({
+            time: t,
+            loadMult: loadPattern[t],
+            pvGen: pvPattern[t],
+            converged: res?.converged || false,
+            Vm: res?.Vm || [],
+            totalPLoss: res?.totalPLoss || 0,
+            minVoltage: res?.Vm ? Math.min(...res.Vm) : 0,
+            maxVoltage: res?.Vm ? Math.max(...res.Vm) : 0
+        });
+        progress.style.width = ((t + 1) / steps * 100) + '%';
+        await new Promise(r => setTimeout(r, 5));
+    }
+    
+    setStatus('converged', '完了');
+    log('success', '時系列シミュレーション完了');
+    
+    document.getElementById('timeseriesResultCard').style.display = 'block';
+    drawTimeseriesChart();
+    
+    const maxLoss = Math.max(...timeseriesResults.map(r => r.totalPLoss));
+    const minV = Math.min(...timeseriesResults.map(r => r.minVoltage));
+    document.getElementById('tsMaxLoss').textContent = maxLoss.toFixed(3) + ' MW';
+    document.getElementById('tsMinVoltage').textContent = minV.toFixed(4) + ' pu';
+}
+
+function drawTimeseriesChart() {
+    const chart = document.getElementById('timeseriesChart');
+    const c = chart.getContext('2d');
+    const container = chart.parentElement;
+    chart.width = container.clientWidth - 20;
+    chart.height = container.clientHeight - 20;
+    const w = chart.width, h = chart.height, p = {l: 45, r: 45, t: 20, b: 30};
+    
+    c.clearRect(0, 0, w, h);
+    if (timeseriesResults.length < 2) return;
+    
+    const n = timeseriesResults.length;
+    const vMin = Math.min(...timeseriesResults.map(r => r.minVoltage)) - 0.01;
+    const vMax = Math.max(...timeseriesResults.map(r => r.maxVoltage)) + 0.01;
+    const lossMax = Math.max(...timeseriesResults.map(r => r.totalPLoss)) * 1.1 || 1;
+    
+    const xScale = (w - p.l - p.r) / (n - 1);
+    const vScale = (h - p.t - p.b) / (vMax - vMin || 1);
+    const lScale = (h - p.t - p.b) / lossMax;
+    
+    // Axes
+    c.strokeStyle = '#30363d'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(p.l, p.t); c.lineTo(p.l, h - p.b); c.lineTo(w - p.r, h - p.b); c.lineTo(w - p.r, p.t); c.stroke();
+    
+    // Voltage band
+    c.fillStyle = 'rgba(0, 212, 255, 0.2)';
+    c.beginPath();
+    timeseriesResults.forEach((r, i) => { const x = p.l + i * xScale, y = h - p.b - (r.maxVoltage - vMin) * vScale; i === 0 ? c.moveTo(x, y) : c.lineTo(x, y); });
+    for (let i = n - 1; i >= 0; i--) { const x = p.l + i * xScale, y = h - p.b - (timeseriesResults[i].minVoltage - vMin) * vScale; c.lineTo(x, y); }
+    c.closePath(); c.fill();
+    
+    // Min voltage line
+    c.strokeStyle = '#00d4ff'; c.lineWidth = 2;
+    c.beginPath();
+    timeseriesResults.forEach((r, i) => { const x = p.l + i * xScale, y = h - p.b - (r.minVoltage - vMin) * vScale; i === 0 ? c.moveTo(x, y) : c.lineTo(x, y); });
+    c.stroke();
+    
+    // Loss line
+    c.strokeStyle = '#ff4757'; c.lineWidth = 2;
+    c.beginPath();
+    timeseriesResults.forEach((r, i) => { const x = p.l + i * xScale, y = h - p.b - r.totalPLoss * lScale; i === 0 ? c.moveTo(x, y) : c.lineTo(x, y); });
+    c.stroke();
+    
+    // Labels
+    c.fillStyle = '#00d4ff'; c.font = '10px JetBrains Mono'; c.textAlign = 'right';
+    for (let v = Math.ceil(vMin * 20) / 20; v <= vMax; v += 0.02) { const y = h - p.b - (v - vMin) * vScale; c.fillText(v.toFixed(2), p.l - 5, y + 3); }
+    c.fillStyle = '#ff4757'; c.textAlign = 'left';
+    for (let l = 0; l <= lossMax; l += lossMax / 4) { const y = h - p.b - l * lScale; c.fillText(l.toFixed(1), w - p.r + 5, y + 3); }
+    c.fillStyle = '#8b949e'; c.textAlign = 'center';
+    const step = Math.ceil(n / 8);
+    for (let i = 0; i < n; i += step) { c.fillText(i.toString(), p.l + i * xScale, h - p.b + 15); }
+    c.font = '11px JetBrains Mono';
+    c.fillStyle = '#00d4ff'; c.fillText('電圧 [pu]', p.l + 50, p.t + 10);
+    c.fillStyle = '#ff4757'; c.fillText('損失 [MW]', w - p.r - 50, p.t + 10);
+}
+
+// ===== Visualization =====
+function drawNetwork() {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(0,212,255,0.05)';
+    const gs = 30 * zoom;
+    for (let x = panX % gs; x < canvas.width; x += gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+    for (let y = panY % gs; y < canvas.height; y += gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+    if (busData.length === 0) return;
+    const pos = calcPositions();
+    branchData.forEach(br => {
+        const p1 = pos[br.from-1], p2 = pos[br.to-1];
+        if (!p1 || !p2) return;
+        ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    });
+    const vMax = parseFloat(document.getElementById('vMax').value) || 1.05;
+    const vMin = parseFloat(document.getElementById('vMin').value) || 0.95;
+    busData.forEach((bus, i) => {
+        const p = pos[i]; if (!p) return;
+        const r = Math.max(10, 18 - busData.length/5) * zoom;
+        let color = '#ffd000';
+        if (bus.type === 3) color = '#00ff88';
+        else if (bus.type === 2) color = '#00d4ff';
+        else if (results?.Vm) {
+            const vm = results.Vm[i];
+            if (vm > vMax) color = '#ff4757';
+            else if (vm < vMin) color = '#ffd000';
+            else color = '#00ff88';
+        }
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+        ctx.fillStyle = color + '33'; ctx.fill();
+        ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = color; ctx.font = 'bold ' + Math.max(8, 11 - busData.length/10)*zoom + 'px JetBrains Mono';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(i+1, p.x, p.y);
+    });
+}
+
+function calcPositions() {
+    const n = busData.length, cx = canvas.width/2 + panX, cy = canvas.height/2 + panY;
+    const r = Math.min(canvas.width, canvas.height) * 0.38 * zoom;
+    return busData.map((_, i) => { const a = 2*Math.PI*i/n - Math.PI/2; return {x: cx + r*Math.cos(a), y: cy + r*Math.sin(a)}; });
+}
+
+function zoomIn() { zoom = Math.min(zoom*1.2, 3); drawNetwork(); }
+function zoomOut() { zoom = Math.max(zoom/1.2, 0.3); drawNetwork(); }
+function resetView() { zoom = 1; panX = 0; panY = 0; drawNetwork(); }
+
+function exportResults() {
+    if (!results?.converged) { log('warning', 'エクスポートデータなし'); return; }
+    const baseMVA = results.baseMVA || 100;
+    let out = '=== PowerFlow Web 結果 ===\n';
+    out += 'Bus,|V| [pu],θ [deg],P [MW],Q [Mvar]\n';
+    const n = busData.length;
+    const Ybus = buildYbus(n, branchData);
+    const {P, Q} = calcPower(results.Vm, results.Va, Ybus, n);
+    results.Vm.forEach((vm,i) => out += (i+1)+','+(vm||0).toFixed(4)+','+((results.Va[i]||0)*180/Math.PI).toFixed(2)+','+((P[i]||0)*baseMVA).toFixed(2)+','+((Q[i]||0)*baseMVA).toFixed(2)+'\n');
+    out += '\nFrom,To,Pij [MW],Qij [Mvar],Loss [MW]\n';
+    (results.branchFlows||[]).forEach(f => out += f.from+','+f.to+','+(f.Pij||0).toFixed(2)+','+(f.Qij||0).toFixed(2)+','+(f.Ploss||0).toFixed(4)+'\n');
+    out += '\n総損失: ' + (results.totalPLoss||0).toFixed(4) + ' MW\n';
+    if (timeseriesResults.length > 0) {
+        out += '\n=== 時系列結果 ===\nStep,LoadMult,PVGen,MinV,MaxV,Loss\n';
+        timeseriesResults.forEach(r => out += r.time+','+r.loadMult.toFixed(3)+','+r.pvGen.toFixed(1)+','+r.minVoltage.toFixed(4)+','+r.maxVoltage.toFixed(4)+','+r.totalPLoss.toFixed(3)+'\n');
+    }
+    downloadFile(out, 'powerflow_results.csv', 'text/csv');
+    log('success', '結果をエクスポート');
+}
+</script>
+</body>
+</html>
